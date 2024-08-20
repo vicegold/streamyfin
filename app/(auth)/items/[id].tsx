@@ -1,10 +1,5 @@
 import { AudioTrackSelector } from "@/components/AudioTrackSelector";
 import { Bitrate, BitrateSelector } from "@/components/BitrateSelector";
-import {
-  currentlyPlayingItemAtom,
-  fullScreenAtom,
-  playingAtom,
-} from "@/components/CurrentlyPlayingBar";
 import { DownloadItem } from "@/components/DownloadItem";
 import { Loader } from "@/components/Loader";
 import { OverviewText } from "@/components/OverviewText";
@@ -20,6 +15,12 @@ import { CurrentSeries } from "@/components/series/CurrentSeries";
 import { NextEpisodeButton } from "@/components/series/NextEpisodeButton";
 import { SeriesTitleHeader } from "@/components/series/SeriesTitleHeader";
 import { apiAtom, userAtom } from "@/providers/JellyfinProvider";
+import {
+  currentlyPlayingItemAtom,
+  fullScreenAtom,
+  playingAtom,
+  showCurrentlyPlayingBarAtom,
+} from "@/utils/atoms/playState";
 import { useSettings } from "@/utils/atoms/settings";
 import { getBackdropUrl } from "@/utils/jellyfin/image/getBackdropUrl";
 import { getLogoImageUrlById } from "@/utils/jellyfin/image/getLogoImageUrlById";
@@ -55,6 +56,7 @@ const page: React.FC = () => {
   const castDevice = useCastDevice();
 
   const [, setCurrentlyPlying] = useAtom(currentlyPlayingItemAtom);
+  const [, setShowCurrentlyPlayingBar] = useAtom(showCurrentlyPlayingBarAtom);
   const [, setPlaying] = useAtom(playingAtom);
   const [, setFullscreen] = useAtom(fullScreenAtom);
 
@@ -168,8 +170,12 @@ const page: React.FC = () => {
           playbackUrl,
         });
         setPlaying(true);
+        setShowCurrentlyPlayingBar(true);
+
         if (settings?.openFullScreenVideoPlayerByDefault === true) {
-          setFullscreen(true);
+          setTimeout(() => {
+            setFullscreen(true);
+          }, 100);
         }
       }
     },
@@ -274,12 +280,7 @@ const page: React.FC = () => {
         </View>
         <View className="flex flex-row items-center justify-between w-full">
           <NextEpisodeButton item={item} type="previous" className="mr-2" />
-          <PlayButton
-            item={item}
-            chromecastReady={chromecastReady}
-            onPress={onPressPlay}
-            className="grow"
-          />
+          <PlayButton item={item} url={playbackUrl} className="grow" />
           <NextEpisodeButton item={item} className="ml-2" />
         </View>
       </View>

@@ -1,8 +1,12 @@
+import {
+  currentlyPlayingItemAtom,
+  playingAtom,
+  showCurrentlyPlayingBarAtom,
+} from "@/utils/atoms/playState";
 import { Api, Jellyfin } from "@jellyfin/sdk";
 import { UserDto } from "@jellyfin/sdk/lib/generated-client/models";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { isLoaded } from "expo-font";
 import { router, useSegments } from "expo-router";
 import { atom, useAtom } from "jotai";
 import React, {
@@ -21,6 +25,7 @@ interface Server {
 
 export const apiAtom = atom<Api | null>(null);
 export const userAtom = atom<UserDto | null>(null);
+export const wsAtom = atom<WebSocket | null>(null);
 
 interface JellyfinContextValue {
   discoverServers: (url: string) => Promise<Server[]>;
@@ -31,7 +36,7 @@ interface JellyfinContextValue {
 }
 
 const JellyfinContext = createContext<JellyfinContextValue | undefined>(
-  undefined,
+  undefined
 );
 
 const getOrSetDeviceId = async () => {
@@ -49,6 +54,8 @@ export const JellyfinProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const [jellyfin, setJellyfin] = useState<Jellyfin | undefined>(undefined);
+  const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
 
   useEffect(() => {
     (async () => {
@@ -56,10 +63,11 @@ export const JellyfinProvider: React.FC<{ children: ReactNode }> = ({
       setJellyfin(
         () =>
           new Jellyfin({
-            clientInfo: { name: "Streamyfin", version: "0.6.1" },
+            clientInfo: { name: "Streamyfin", version: "0.6.2" },
             deviceInfo: { name: Platform.OS === "ios" ? "iOS" : "Android", id },
-          }),
+          })
       );
+      setDeviceId(id);
     })();
   }, []);
 
@@ -67,8 +75,9 @@ export const JellyfinProvider: React.FC<{ children: ReactNode }> = ({
   const [user, setUser] = useAtom(userAtom);
 
   const discoverServers = async (url: string): Promise<Server[]> => {
-    const servers =
-      await jellyfin?.discovery.getRecommendedServerCandidates(url);
+    const servers = await jellyfin?.discovery.getRecommendedServerCandidates(
+      url
+    );
     return servers?.map((server) => ({ address: server.address })) || [];
   };
 
@@ -144,7 +153,7 @@ export const JellyfinProvider: React.FC<{ children: ReactNode }> = ({
         const token = await AsyncStorage.getItem("token");
         const serverUrl = await AsyncStorage.getItem("serverUrl");
         const user = JSON.parse(
-          (await AsyncStorage.getItem("user")) as string,
+          (await AsyncStorage.getItem("user")) as string
         ) as UserDto;
 
         if (serverUrl && token && user.Id && jellyfin) {

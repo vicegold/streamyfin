@@ -1,27 +1,30 @@
+import { usePlayback } from "@/providers/PlaybackProvider";
 import { runtimeTicksToMinutes } from "@/utils/time";
 import { useActionSheet } from "@expo/react-native-action-sheet";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
 import { View } from "react-native";
+import CastContext, {
+  PlayServicesState,
+  useRemoteMediaClient,
+} from "react-native-google-cast";
 import { Button } from "./Button";
 
 interface Props extends React.ComponentProps<typeof Button> {
-  item: BaseItemDto;
-  onPress: (type?: "cast" | "device") => void;
-  chromecastReady: boolean;
+  item?: BaseItemDto | null;
+  url?: string | null;
 }
 
-export const PlayButton: React.FC<Props> = ({
-  item,
-  onPress,
-  chromecastReady,
-  ...props
-}) => {
+export const PlayButton: React.FC<Props> = ({ item, url, ...props }) => {
   const { showActionSheetWithOptions } = useActionSheet();
+  const client = useRemoteMediaClient();
+  const { currentlyPlaying, setCurrentlyPlayingState } = usePlayback();
 
-  const _onPress = () => {
-    if (!chromecastReady) {
-      onPress("device");
+  const onPress = async () => {
+    if (!url || !item) return;
+
+    if (!client) {
+      setCurrentlyPlayingState({ item, url });
       return;
     }
 
@@ -33,28 +36,45 @@ export const PlayButton: React.FC<Props> = ({
         options,
         cancelButtonIndex,
       },
-      (selectedIndex: number | undefined) => {
+      async (selectedIndex: number | undefined) => {
         switch (selectedIndex) {
           case 0:
-            onPress("cast");
+            await CastContext.getPlayServicesState().then((state) => {
+              if (state && state !== PlayServicesState.SUCCESS)
+                CastContext.showPlayServicesErrorDialog(state);
+              else {
+                client.loadMedia({
+                  mediaInfo: {
+                    contentUrl: url,
+                    contentType: "video/mp4",
+                    metadata: {
+                      type: item.Type === "Episode" ? "tvShow" : "movie",
+                      title: item.Name || "",
+                      subtitle: item.Overview || "",
+                    },
+                  },
+                  startTime: 0,
+                });
+              }
+            });
             break;
           case 1:
-            onPress("device");
+            setCurrentlyPlayingState({ item, url });
             break;
           case cancelButtonIndex:
             break;
         }
-      },
+      }
     );
   };
 
   return (
     <Button
-      onPress={_onPress}
+      onPress={onPress}
       iconRight={
         <View className="flex flex-row items-center space-x-2">
           <Ionicons name="play-circle" size={24} color="white" />
-          {chromecastReady && <Feather name="cast" size={22} color="white" />}
+          {client && <Feather name="cast" size={22} color="white" />}
         </View>
       }
       {...props}
